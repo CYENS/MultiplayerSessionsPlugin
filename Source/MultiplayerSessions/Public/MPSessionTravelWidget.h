@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "Containers/Union.h"
 #include "Interfaces/OnlineSessionInterface.h"
 #include "MPSessionTravelWidget.generated.h"
 
@@ -12,6 +13,31 @@ DECLARE_LOG_CATEGORY_EXTERN(LogMPSessionTravelWidget, Log, All);
 class UMultiplayerSessionsSubsystem;
 
 struct FBPSessionResult;
+
+UENUM(BlueprintType)
+enum class EComparisonOp: uint8
+{
+	Equals,
+	NotEquals,
+	GreaterThan,
+	GreaterThanEquals,
+	LessThan,
+	LessThanEquals,
+	Near,
+	In,
+	NotIn
+};
+
+USTRUCT(BlueprintType)
+struct FBPQuerySetting
+{
+	GENERATED_BODY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FString SettingValue;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	EComparisonOp ComparisonOp;
+	
+};
 
 UCLASS()
 class MULTIPLAYERSESSIONS_API UMPSessionTravelWidget : public UUserWidget
@@ -34,7 +60,10 @@ public:
 	);
 
 	UFUNCTION(BlueprintCallable, Category="Μultiplayer Sessions")
-	void FindSessions(const int32 MaxSearchResults = 1000) const;
+	void FindSessions(
+		const int32 MaxSearchResults,
+		const TMap<FName, FBPQuerySetting> QuerySettings
+	) const;
 	UFUNCTION(BlueprintCallable, Category="Μultiplayer Sessions")
 	void JoinSession(const FBPSessionResult& SearchResult);
 	
@@ -64,6 +93,7 @@ private:
 	UFUNCTION(BlueprintCallable, Category="MultiplayerSessions")
 	void StartMultiplayerSession() const;
 
+	static EOnlineComparisonOp::Type ConvertEComparisonOpToEOnlineComparisonOp(EComparisonOp ComparisonOp);
 	void MenuTeardown();
 
 	int32 NumPublicConnections { 4 };

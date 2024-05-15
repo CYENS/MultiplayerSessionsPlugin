@@ -118,12 +118,15 @@ void UMultiplayerSessionsSubsystem::SetupLastSessionSettings(const TMap<FName, F
 }
 
 
-bool UMultiplayerSessionsSubsystem::TryAsyncFindSessions(const int32 MaxSearchResults)
+bool UMultiplayerSessionsSubsystem::TryAsyncFindSessions(
+	const int32 MaxSearchResults,
+	const TMap<FName, FQuerySetting>& ExtraQuerySettings
+)
 {
 	bool bHasSuccessfullyIssuedAsyncFindSessions = false;
 	if (const UWorld* World = GetWorld())
 	{
-		SetupLastSessionSearchOptions(MaxSearchResults);
+		SetupLastSessionSearchOptions(MaxSearchResults, ExtraQuerySettings);
 		
 		FindSessionsCompleteDelegateHandle = SessionInterface->AddOnFindSessionsCompleteDelegate_Handle(FindSessionsCompleteDelegate);
 		
@@ -152,19 +155,32 @@ bool UMultiplayerSessionsSubsystem::TryAsyncFindSessions(const int32 MaxSearchRe
 	return bHasSuccessfullyIssuedAsyncFindSessions;
 }
 
-void UMultiplayerSessionsSubsystem::SetupLastSessionSearchOptions(const int32 MaxSearchResults)
+void UMultiplayerSessionsSubsystem::SetupLastSessionSearchOptions(
+	const int32 MaxSearchResults,
+	const TMap<FName, FQuerySetting>& ExtraQuerySettings
+)
 {
 	LastSessionSearch = MakeShareable(new FOnlineSessionSearch);
 	LastSessionSearch->bIsLanQuery = IOnlineSubsystem::Get()->GetSubsystemName() == "NULL";
 	LastSessionSearch->MaxSearchResults = MaxSearchResults;
 	LastSessionSearch->QuerySettings.Set(SEARCH_PRESENCE, true, EOnlineComparisonOp::Equals);
+	for (const auto& QuerySetting : ExtraQuerySettings)
+	{
+		const FName QuerySettingName = QuerySetting.Key;
+		const auto [Value, ComparisonOp] = QuerySetting.Value;
+		LastSessionSearch->QuerySettings.Set(QuerySettingName, Value, ComparisonOp);
+		UE_LOG(LogMultiplayerSessionsSubsystem, Warning, TEXT("%s %s %s"), *QuerySettingName.ToString(), *Value, ComparisonOp);
+	}
 }
 
-void UMultiplayerSessionsSubsystem::FindSessions(const int32 MaxSearchResults)
+void UMultiplayerSessionsSubsystem::FindSessions(
+	const int32 MaxSearchResults,
+	const TMap<FName, FQuerySetting>& QuerySettings
+)
 {
 	if (IsSessionInterfaceInvalid()) return;
 
-	if (!TryAsyncFindSessions(MaxSearchResults))
+	if (!TryAsyncFindSessions(MaxSearchResults, QuerySettings))
 	{
 		UE_LOG(LogMultiplayerSessionsSubsystem, Error, TEXT("FindSessions failed to issue"));
 		MultiplayerOnFindSessionsComplete.Broadcast(TArray<FOnlineSessionSearchResult>(), false);

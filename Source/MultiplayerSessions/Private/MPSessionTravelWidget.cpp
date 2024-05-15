@@ -51,14 +51,32 @@ void UMPSessionTravelWidget::CreateSession(
 	MultiplayerSessionsSubsystem->CreateSession(NumPublicConnections, SessionSettings);
 }
 
-void UMPSessionTravelWidget::FindSessions(const int32 MaxSearchResults) const 
+void UMPSessionTravelWidget::FindSessions(
+	const int32 MaxSearchResults = 1000,
+	const TMap<FName, FBPQuerySetting> QuerySettings = TMap<FName, FBPQuerySetting> ()
+) const 
 {
 	if (MultiplayerSessionsSubsystem == nullptr)
 	{
 		UE_LOG(LogMPSessionTravelWidget, Error, TEXT("Failed to issue FindSessions, MultiplayerSessionsSubsystem is null"));
 		return;
 	}
-	MultiplayerSessionsSubsystem->FindSessions(MaxSearchResults);
+	TMap<FName, FQuerySetting> OnlineQuerySettings;
+	for (const auto& BPQuerySettingPair: QuerySettings)
+	{
+		FName QuerySettingName = BPQuerySettingPair.Key;
+		const auto [QuerySettingValue, ComparisonOp] = BPQuerySettingPair.Value;
+		const EOnlineComparisonOp::Type OnlineComparisonOp = ConvertEComparisonOpToEOnlineComparisonOp(ComparisonOp);
+		FQuerySetting QuerySetting;
+		QuerySetting.Value = QuerySettingValue;
+		QuerySetting.ComparisonOp = OnlineComparisonOp;
+		const uint8 ComparisonOpAsUint8 = static_cast<uint8>(ComparisonOp);
+		UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("ComparisonOp as uint8: %d"), ComparisonOpAsUint8);
+
+		OnlineQuerySettings.Add(QuerySettingName, QuerySetting);
+	}
+	
+	MultiplayerSessionsSubsystem->FindSessions(MaxSearchResults, OnlineQuerySettings);
 }
 
 void UMPSessionTravelWidget::JoinSession(const FBPSessionResult& SearchResult)
@@ -149,6 +167,33 @@ void UMPSessionTravelWidget::StartMultiplayerSession() const
 	{
 		UE_LOG(LogMPSessionTravelWidget, Error, TEXT("Menu: MultiplayerSessionsSubsystem is null"));
 	}
+}
+
+EOnlineComparisonOp::Type UMPSessionTravelWidget::ConvertEComparisonOpToEOnlineComparisonOp(EComparisonOp ComparisonOp)
+{
+	switch (ComparisonOp)
+	{
+	case EComparisonOp::Equals:
+		UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("Equals"));
+		return EOnlineComparisonOp::Equals;
+	case EComparisonOp::NotEquals:
+		return EOnlineComparisonOp::NotEquals;
+	case EComparisonOp::GreaterThan:
+		return EOnlineComparisonOp::GreaterThan;
+	case EComparisonOp::GreaterThanEquals:
+		return EOnlineComparisonOp::GreaterThanEquals;
+	case EComparisonOp::LessThan:
+		return EOnlineComparisonOp::LessThan;
+	case EComparisonOp::LessThanEquals:
+		return EOnlineComparisonOp::LessThanEquals;
+	case EComparisonOp::Near:
+		return EOnlineComparisonOp::Near;
+	case EComparisonOp::In:
+		return EOnlineComparisonOp::In;
+	case EComparisonOp::NotIn:
+		return EOnlineComparisonOp::NotIn;
+	}
+	return EOnlineComparisonOp::Equals;
 }
 
 void UMPSessionTravelWidget::OnCreateSessionComplete(bool bWasSuccessful)

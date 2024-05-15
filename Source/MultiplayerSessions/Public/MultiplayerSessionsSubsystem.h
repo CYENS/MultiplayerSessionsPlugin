@@ -19,6 +19,13 @@ DECLARE_MULTICAST_DELEGATE_TwoParams(FMultiplayerOnJoinSessionComplete, const FN
 DECLARE_MULTICAST_DELEGATE_OneParam(FMultiplayerOnStartSessionComplete, bool bWasSuccessful);
 DECLARE_MULTICAST_DELEGATE_OneParam(FMultiplayerOnDestroySessionComplete, bool bWasSuccessful);
 
+
+struct FQuerySetting
+{
+	FString Value;
+	EOnlineComparisonOp::Type ComparisonOp = EOnlineComparisonOp::Equals;
+};
+
 /**
  * 
  */
@@ -38,7 +45,7 @@ public:
 		const int32 NumPublicConnections,
 		const TMap<FName, FString>& SessionSettings = TMap<FName, FString> ()
 	);
-	void FindSessions(const int32 MaxSearchResults);
+	void FindSessions(const int32 MaxSearchResults, const TMap<FName, FQuerySetting>& QuerySettings = TMap<FName, FQuerySetting> ());
 	void JoinSession(const FOnlineSessionSearchResult& SearchResult);
 	void DestroySession();
 	bool StartSession();
@@ -72,8 +79,8 @@ protected:
 	bool TryAsyncCreateSession(const TMap<FName, FString>& SessionSettings = TMap<FName, FString>());
 	void SetupLastSessionSettings(const TMap<FName, FString>& ExtraSessionSettings);
 	bool DestroyPreviousSessionIfExists(const int32 NumPublicConnections);
-	bool TryAsyncFindSessions(int32 MaxSearchResults);
-	void SetupLastSessionSearchOptions(int32 MaxSearchResults);
+	bool TryAsyncFindSessions(int32 MaxSearchResults, const TMap<FName, FQuerySetting>& ExtraQuerySettings);
+	void SetupLastSessionSearchOptions(const int32 MaxSearchResults, const TMap<FName, FQuerySetting>& ExtraQuerySettings);
 
 private:
 	IOnlineSessionPtr SessionInterface;
