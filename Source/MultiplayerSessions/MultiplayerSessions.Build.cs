@@ -25,10 +25,12 @@ public class MultiplayerSessions : ModuleRules
 		PublicDependencyModuleNames.AddRange(
 			new string[]
 			{
-				"Core",
+				"Core", 
+				"Projects",
 				"OnlineSubsystem",
 				"OnlineSubsystemSteam",
 				"UMG",
+				"ToolMenus"
 				// ... add other public dependencies that you statically link with here ...
 			}
 			);
@@ -37,9 +39,6 @@ public class MultiplayerSessions : ModuleRules
 		PrivateDependencyModuleNames.AddRange(
 			new string[]
 			{
-				"Projects",
-				"InputCore",
-				"ToolMenus",
 				"CoreUObject",
 				"Engine",
 				"Slate",
@@ -48,17 +47,6 @@ public class MultiplayerSessions : ModuleRules
 			}
 			);
 		
-		if (Target.bBuildEditor)
-		{
-			PrivateDependencyModuleNames.AddRange(
-				new string[]
-				{
-					"EditorFramework",
-					"UnrealEd",
-					// ... add other editor-specific dependencies here ...
-				}
-			);
-		}
 		
 		DynamicallyLoadedModuleNames.AddRange(
 			new string[]
