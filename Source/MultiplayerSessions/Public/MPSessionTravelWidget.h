@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Enums/Online/ComparisonOp.h"
 #include "Blueprint/UserWidget.h"
 #include "Containers/Union.h"
 #include "Interfaces/OnlineSessionInterface.h"
@@ -13,20 +14,6 @@ DECLARE_LOG_CATEGORY_EXTERN(LogMPSessionTravelWidget, Log, All);
 class UMultiplayerSessionsSubsystem;
 
 struct FBPSessionResult;
-
-UENUM(BlueprintType)
-enum class EComparisonOp: uint8
-{
-	Equals,
-	NotEquals,
-	GreaterThan,
-	GreaterThanEquals,
-	LessThan,
-	LessThanEquals,
-	Near,
-	In,
-	NotIn
-};
 
 USTRUCT(BlueprintType)
 struct FBPQuerySetting
