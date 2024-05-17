@@ -3,7 +3,7 @@
 #include "CoreMinimal.h"
 #include "ComparisonOp.generated.h"
 
-UENUM(BlueprintType)
+UENUM(BlueprintType, Category="Multiplayer Sessions")
 enum class EComparisonOp: uint8
 {
 	Equals,

@@ -169,7 +169,7 @@ void UMultiplayerSessionsSubsystem::SetupLastSessionSearchOptions(
 		const FName QuerySettingName = QuerySetting.Key;
 		const auto [Value, ComparisonOp] = QuerySetting.Value;
 		LastSessionSearch->QuerySettings.Set(QuerySettingName, Value, ComparisonOp);
-		UE_LOG(LogMultiplayerSessionsSubsystem, Warning, TEXT("%s %s %s"), *QuerySettingName.ToString(), *Value, ComparisonOp);
+		UE_LOG(LogMultiplayerSessionsSubsystem, Warning, TEXT("%s %s %d"), *QuerySettingName.ToString(), *Value, ComparisonOp);
 	}
 }
 
@@ -390,6 +390,17 @@ bool UMultiplayerSessionsSubsystem::GetResolvedConnectString(const FName& Sessio
 	}
 
 	return SessionInterface->GetResolvedConnectString(NAME_GameSession, ConnectInfo);
+}
+
+bool UMultiplayerSessionsSubsystem::GetResolvedConnectString(const FOnlineSessionSearchResult& SearchResult, const FName PortType, FString& ConnectInfo) const
+{
+	if (!SessionInterface.IsValid())
+	{
+		UE_LOG(LogMultiplayerSessionsSubsystem, Error, TEXT("SessionInterface is not valid"));
+		return false;
+	}
+	
+	return SessionInterface->GetResolvedConnectString(SearchResult, PortType, ConnectInfo);
 }
 
 bool UMultiplayerSessionsSubsystem::TryFirstLocalPlayerControllerClientTravel(const FString& Address)

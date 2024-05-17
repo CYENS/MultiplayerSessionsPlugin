@@ -3,7 +3,7 @@
 
 #include "MPSessionTravelWidget.h"
 
-#include "BlueprintSessionResult.h"
+#include "Structs/Online/BPSessionResult.h"
 #include "MultiplayerSessionsSubsystem.h"
 #include "OnlineSessionSettings.h"
 
@@ -288,6 +288,7 @@ void UMPSessionTravelWidget::OnFindSessionsComplete(const TArray<FOnlineSessionS
 		BPSearchResult.OwningUserName = Name;
 		BPSearchResult.SessionSettings = SessionSettings;
 		BPSearchResult.SearchResult = SearchResult;
+		MultiplayerSessionsSubsystem->GetResolvedConnectString(SearchResult, NAME_GamePort, BPSearchResult.ConnectionString);
 		BlueprintSearchResults.Add(BPSearchResult);
 	}
 	OnSessionsFound(BlueprintSearchResults, bWasSuccessful);

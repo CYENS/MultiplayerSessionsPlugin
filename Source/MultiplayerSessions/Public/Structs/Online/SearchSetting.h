@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "SearchSetting.generated.h"
 
-USTRUCT(BlueprintType)
+USTRUCT(BlueprintType, Category="Multiplayer Sessions")
 struct MULTIPLAYERSESSIONS_API FSearchSetting
 {
 	GENERATED_BODY()

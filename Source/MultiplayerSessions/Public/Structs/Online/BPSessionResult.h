@@ -6,7 +6,7 @@
 #include "OnlineSessionSettings.h"
 #include "BPSessionResult.generated.h"
 
-USTRUCT(BlueprintType)
+USTRUCT(BlueprintType, Category="Multiplayer Sessions")
 struct  MULTIPLAYERSESSIONS_API FBPSessionResult
 {
 	GENERATED_BODY()
@@ -18,14 +18,14 @@ struct  MULTIPLAYERSESSIONS_API FBPSessionResult
 	int PingInMs;
 
 	UPROPERTY(BlueprintReadOnly)
-	FString OwnerUsername;
+	FString OwningUserName;
 
 	UPROPERTY(BlueprintReadOnly)
-	FString SessionId;
+	FString Id;
 	
 	UPROPERTY(BlueprintReadOnly)
 	TMap<FName, FString> SessionSettings;
 
-	FOnlineSessionSearchResult OnlineResult;
+	FOnlineSessionSearchResult SearchResult;
 	
 };

@@ -63,6 +63,16 @@ public:
 	 * Utility functions for the Menu class to use.
 	 */
 	bool GetResolvedConnectString(const FName& SessionName, FString& ConnectInfo) const;
+	/**
+	 * Returns the platform specific connection information for joining a search result.
+	 *
+	 * @param SearchResult the search result to get connection info from
+	 * @param PortType type of port to append to result (Game, Beacon, etc)
+	 * @param ConnectInfo the string containing the platform specific connection information
+	 *
+	 * @return true if the call was successful, false otherwise
+	 */
+	bool GetResolvedConnectString(const class FOnlineSessionSearchResult& SearchResult, FName PortType, FString& ConnectInfo) const;
 	bool TryFirstLocalPlayerControllerClientTravel(const FString& Address);
 	bool TryFirstLocalPlayerControllerClientTravel(const FName& SessionName);
 
