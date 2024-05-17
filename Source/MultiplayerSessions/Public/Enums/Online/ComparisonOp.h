@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "OnlineSubsystemTypes.h"
 #include "ComparisonOp.generated.h"
 
 UENUM(BlueprintType, Category="Multiplayer Sessions")
@@ -16,3 +17,6 @@ enum class EComparisonOp: uint8
 	In,
 	NotIn
 };
+
+EOnlineComparisonOp::Type ConvertToOnlineComparisonOp(EComparisonOp ComparisonOp);
+EComparisonOp ConvertToComparisonOp(EOnlineComparisonOp::Type ComparisonOp);
