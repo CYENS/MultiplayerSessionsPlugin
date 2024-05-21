@@ -81,9 +81,14 @@ bool UMultiplayerSessionsSubsystem::TryAsyncCreateSession(const TMap<FName, FStr
 	SetupLastSessionSettings(SessionSettings);
 	
 	bool bHasSuccessfullyIssuedAsyncCreateSession = false;
+	const ULocalPlayer* LocalPlayer = GetWorld()->GetFirstLocalPlayerFromController();
+	if (!LocalPlayer->GetPreferredUniqueNetId().GetUniqueNetId().IsValid())
+	{
+		UE_LOG(LogMultiplayerSessionsSubsystem, Error, TEXT("Could not GetPreferredUniqueNetId(). Pointer invalid"));
+		return false;
+	}
 	if (
-		const ULocalPlayer* LocalPlayer = GetWorld()->GetFirstLocalPlayerFromController();
-		SessionInterface->CreateSession(*LocalPlayer->GetPreferredUniqueNetId(), NAME_GameSession, *LastSessionSettings)
+		SessionInterface->CreateSession(*LocalPlayer->GetPreferredUniqueNetId(), NAME_GameSession, *LastSessionSettings.ToSharedRef())
 	)
 	{
 		bHasSuccessfullyIssuedAsyncCreateSession = true;

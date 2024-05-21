@@ -156,6 +156,7 @@ void UMPSessionTravelWidget::OnCreateSessionComplete(bool bWasSuccessful)
 	if (!bWasSuccessful)
 	{
 		UE_LOG(LogMPSessionTravelWidget, Error, TEXT("Menu: Failed to create session"));
+		return;
 	}
 	UE_LOG(LogMPSessionTravelWidget, Log, TEXT("Menu: Session Created successfully"));
 
