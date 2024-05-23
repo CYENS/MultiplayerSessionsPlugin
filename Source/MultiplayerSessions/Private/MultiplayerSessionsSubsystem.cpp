@@ -26,12 +26,13 @@ UMultiplayerSessionsSubsystem::UMultiplayerSessionsSubsystem():
 	IsLoggedIn(false),
 	ShouldCreateSessionOnLogin(false)
 {
-	const IOnlineSubsystem* Subsystem = IOnlineSubsystem::Get();
+	const IOnlineSubsystem* Subsystem = IOnlineSubsystem::Get("EOS");
 	if (Subsystem == nullptr)
 	{
 		UE_LOG(LogMultiplayerSessionsSubsystem, Error, TEXT("No Online Subsystem found"));
 		return;
 	}
+	UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("Using Online Subsystem ( OSS ): '%s'"), *Subsystem->GetSubsystemName().ToString());
 
 	SessionInterface = Subsystem->GetSessionInterface();
 	IdentityInterface = Subsystem->GetIdentityInterface();
@@ -46,18 +47,26 @@ bool UMultiplayerSessionsSubsystem::TryAsyncLogin()
     */
     // If you're logged in, don't try to login again.
     // This can happen if your player travels to a dedicated server or different maps as BeginPlay() will be called each time.
-	if (!IsIdentityInterfaceInvalid())
+	if (IsIdentityInterfaceInvalid())
 	{
-		UE_LOG(LogMultiplayerSessionsSubsystem, Warning, "Login failed. IdentityInterface is invalid.");
+		UE_LOG(LogMultiplayerSessionsSubsystem, Warning, TEXT("Login failed. IdentityInterface is invalid."));
 		return false;
 	}
     
-    const FUniqueNetIdPtr NetId = IdentityInterface->GetUniquePlayerId(0);
-    if (NetId != nullptr && IdentityInterface->GetLoginStatus(0) == ELoginStatus::LoggedIn)
+    if(const FUniqueNetIdPtr NetId = IdentityInterface->GetUniquePlayerId(0))
     {
-		UE_LOG(LogMultiplayerSessionsSubsystem, Warning, "Login failed. Player already Logged In.");
-        return false; 
+		if(IdentityInterface->GetLoginStatus(0) == ELoginStatus::LoggedIn)
+		{
+			UE_LOG(LogMultiplayerSessionsSubsystem, Warning, TEXT("Login failed. Player already Logged In."));
+			IsLoggedIn = true;
+			return false; 
+		}
     }
+    else
+    {
+    	UE_LOG(LogMultiplayerSessionsSubsystem, Warning, TEXT("Could not retrieve Logged In status. NetId is null."));
+    }
+	
     
     /* This binds a delegate so we can run our function when the callback completes. 0 represents the player number.
     You should parametrize this Login function and pass the parameter here for splitscreen. 
@@ -121,16 +130,19 @@ void UMultiplayerSessionsSubsystem::CreateSession(
 		LastExtraSessionSettings = SessionSettings;
 		if(TryAsyncLogin())
 		{
-			UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("Async login initiated."));
+			UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("Async login initiated. Will create session after login."));
 			return;
 		}
 		else
 		{
 			ShouldCreateSessionOnLogin = false;
-			UE_LOG(LogMultiplayerSessionsSubsystem, Error, TEXT("Failed to issue session creation"));
-			UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("Async login failed."));
-			MultiplayerOnCreateSessionComplete.Broadcast(false);
-			return;
+			if (!IsLoggedIn)
+			{
+				UE_LOG(LogMultiplayerSessionsSubsystem, Error, TEXT("Failed to issue session creation"));
+				UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("Async login failed."));
+				MultiplayerOnCreateSessionComplete.Broadcast(false);
+				return;	
+			}
 		}
 		
 	}
@@ -389,6 +401,7 @@ void UMultiplayerSessionsSubsystem::OnLoginComplete(
   This function handles the callback from logging in. You should not proceed with any EOS features until this function is called.
   This function will remove the delegate that was bound in the Login() function.
   */
+	IsLoggedIn = bWasSuccessful;
 	if (bWasSuccessful)
 	{
 		UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("Login callback completed!"));; 
