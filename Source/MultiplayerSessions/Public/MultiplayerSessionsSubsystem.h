@@ -14,6 +14,7 @@ DECLARE_LOG_CATEGORY_EXTERN(LogMultiplayerSessionsSubsystem, Log, All);
 /**
  * Declaring our own custom delegates for the Menu class to bind callbacks to.
  */
+DECLARE_MULTICAST_DELEGATE_FourParams(FMultiplayerOnLoginComplete, int LocalUserNum, bool bWasSuccseful, const FUniqueNetId& UserId, const FString& Error);
 DECLARE_MULTICAST_DELEGATE_OneParam(FMultiplayerOnCreateSessionComplete, bool bWasSuccessful);
 DECLARE_MULTICAST_DELEGATE_TwoParams(FMultiplayerOnFindSessionsComplete, const TArray<FOnlineSessionSearchResult>& SearchResults, bool bWasSuccessful);
 DECLARE_MULTICAST_DELEGATE_TwoParams(FMultiplayerOnJoinSessionComplete, const FName& SessionName, EOnJoinSessionCompleteResult::Type Result);
@@ -48,6 +49,7 @@ public:
 	/**
 	 * Our own custom delegates for the Menu class to bind callbacks to.
 	 */
+	FMultiplayerOnLoginComplete MultiplayerOnLoginComplete;
 	FMultiplayerOnCreateSessionComplete MultiplayerOnCreateSessionComplete;
 	FMultiplayerOnFindSessionsComplete MultiplayerOnFindSessionsComplete;
 	FMultiplayerOnJoinSessionComplete MultiplayerOnJoinSessionComplete;
@@ -65,7 +67,7 @@ protected:
 	// Internal callbacks we'll bind to the Online Session Interface delegates
 	// These don't need to be called outside of this class.
 	
-	void OnLoginComplete(int LocalUserNum, bool bWasSuccessful, const FUniqueNetId& UserId, const FString& Error);
+	void OnLoginComplete(const int LocalUserNum, const bool bWasSuccessful, const FUniqueNetId& UserId, const FString& Error);
 	void OnCreateSessionComplete(FName SessionName, bool bWasSuccessful);
 	void OnFindSessionsComplete(bool bWasSuccessful);
 	void OnJoinSessionComplete(FName SessionName, EOnJoinSessionCompleteResult::Type Result);

@@ -391,23 +391,23 @@ bool UMultiplayerSessionsSubsystem::StartSession()
 }
 
 void UMultiplayerSessionsSubsystem::OnLoginComplete(
-	int LocalUserNum,
-	bool bWasSuccessful,
+	const int LocalUserNum,
+	const bool bWasSuccessful,
 	const FUniqueNetId& UserId,
 	const FString& Error
 )
 {
 	/*
-  This function handles the callback from logging in. You should not proceed with any EOS features until this function is called.
-  This function will remove the delegate that was bound in the Login() function.
-  */
+		This function handles the callback from logging in. You should not proceed with any EOS features until this function is called.
+		This function will remove the delegate that was bound in the Login() function.
+	*/
 	IsLoggedIn = bWasSuccessful;
 	if (bWasSuccessful)
 	{
-		UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("Login callback completed!"));; 
+		UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("Login success.")); 
 		if (ShouldCreateSessionOnLogin)
 		{
-			UE_LOG(LogMultiplayerSessionsSubsystem, Warning, TEXT("Creating Session after loggin in."));
+			UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("Creating Session after successful Login."));
 			CreateSession(LastNumPublicConnections, LastExtraSessionSettings);
 			ShouldCreateSessionOnLogin = false;
 			LastExtraSessionSettings = TMap<FName, FString>();
@@ -415,31 +415,21 @@ void UMultiplayerSessionsSubsystem::OnLoginComplete(
 	}
 	else
 	{
-		UE_LOG(LogMultiplayerSessionsSubsystem, Warning, TEXT("EOS login failed."));
+		UE_LOG(LogMultiplayerSessionsSubsystem, Warning, TEXT("Login failed. Reason: '%s'"), *Error);
 		if (ShouldCreateSessionOnLogin)
 		{
-			UE_LOG(LogMultiplayerSessionsSubsystem, Warning, TEXT("Could not create session on login. Login failed."));
+			UE_LOG(LogMultiplayerSessionsSubsystem, Warning, TEXT("Could not create session on Login. Login failed."));
 			ShouldCreateSessionOnLogin = false;
 			MultiplayerOnCreateSessionComplete.Broadcast(false);
 		}
 	}
+	MultiplayerOnLoginComplete.Broadcast(LocalUserNum, bWasSuccessful, UserId, Error);
 
-	const IOnlineSubsystem* OnlineSubsystem = IOnlineSubsystem::Get();
-	if (OnlineSubsystem == nullptr)
+	if (!IsIdentityInterfaceInvalid())
 	{
-		UE_LOG(LogMultiplayerSessionsSubsystem, Warning, TEXT("OnlineSubsytem is null.")); 
+		IdentityInterface->ClearOnLoginCompleteDelegate_Handle(LocalUserNum, LoginCompleteDelegateHandle);
+		LoginCompleteDelegateHandle.Reset();
 	}
-	
-	const IOnlineIdentityPtr Identity = OnlineSubsystem->GetIdentityInterface();
-	if (!Identity.IsValid())
-	{
-		UE_LOG(LogMultiplayerSessionsSubsystem, Warning, TEXT("IdentityIntefrace is null.")); 
-		MultiplayerOnCreateSessionComplete.Broadcast(false);
-	}
-	
- 
-	Identity->ClearOnLoginCompleteDelegate_Handle(LocalUserNum, LoginCompleteDelegateHandle);
-	LoginCompleteDelegateHandle.Reset();
 }
 
 void UMultiplayerSessionsSubsystem::OnCreateSessionComplete(FName SessionName, bool bWasSuccessful)
