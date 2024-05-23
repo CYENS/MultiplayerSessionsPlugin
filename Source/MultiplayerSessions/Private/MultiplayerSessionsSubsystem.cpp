@@ -285,6 +285,27 @@ void UMultiplayerSessionsSubsystem::SetupLastSessionSearchOptions(const int32 Ma
 void UMultiplayerSessionsSubsystem::FindSessions(const int32 MaxSearchResults)
 {
 	if (IsSessionInterfaceInvalid()) return;
+	
+	if (!IsLoggedIn)
+	{
+		UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("User not logged in. Attempting to log in."));
+		ShouldFindSessionsOnLogin = true;
+		LastMaxResults = MaxSearchResults;
+		if(TryAsyncLogin())
+		{
+			UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("Async login initiated. Will find sessions after login."));
+			return;
+		}
+		
+		ShouldCreateSessionOnLogin = false;
+		if (!IsLoggedIn)
+		{
+			UE_LOG(LogMultiplayerSessionsSubsystem, Error, TEXT("Login Failed. Can't find sessions"));
+			MultiplayerOnFindSessionsComplete.Broadcast(TArray<FOnlineSessionSearchResult> (),false);
+			return;	
+		}
+	}
+	
 
 	if (!TryAsyncFindSessions(MaxSearchResults))
 	{
@@ -391,8 +412,8 @@ bool UMultiplayerSessionsSubsystem::StartSession()
 }
 
 void UMultiplayerSessionsSubsystem::OnLoginComplete(
-	const int LocalUserNum,
-	const bool bWasSuccessful,
+	int LocalUserNum,
+	bool bWasSuccessful,
 	const FUniqueNetId& UserId,
 	const FString& Error
 )
@@ -412,6 +433,12 @@ void UMultiplayerSessionsSubsystem::OnLoginComplete(
 			ShouldCreateSessionOnLogin = false;
 			LastExtraSessionSettings = TMap<FName, FString>();
 		}
+		if (ShouldFindSessionsOnLogin)
+		{
+			UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("Finding Sessions after successful Login."));
+			FindSessions(LastMaxResults);
+			ShouldFindSessionsOnLogin = false;
+		}
 	}
 	else
 	{
@@ -421,6 +448,12 @@ void UMultiplayerSessionsSubsystem::OnLoginComplete(
 			UE_LOG(LogMultiplayerSessionsSubsystem, Warning, TEXT("Could not create session on Login. Login failed."));
 			ShouldCreateSessionOnLogin = false;
 			MultiplayerOnCreateSessionComplete.Broadcast(false);
+		}
+		if (ShouldFindSessionsOnLogin)
+		{
+			UE_LOG(LogMultiplayerSessionsSubsystem, Warning, TEXT("Could not find sessions on Login. Login failed."));
+			ShouldFindSessionsOnLogin = false;
+			MultiplayerOnFindSessionsComplete.Broadcast(TArray<FOnlineSessionSearchResult>(), false);
 		}
 	}
 	MultiplayerOnLoginComplete.Broadcast(LocalUserNum, bWasSuccessful, UserId, Error);

@@ -87,6 +87,7 @@ private:
 	IOnlineIdentityPtr IdentityInterface;
 	TSharedPtr<FOnlineSessionSettings> LastSessionSettings;
 	TSharedPtr<FOnlineSessionSearch> LastSessionSearch;
+	int32 LastMaxResults;
 	TMap<FName, FString> LastExtraSessionSettings;
 
 	/**
@@ -110,4 +111,5 @@ private:
 	int32 LastNumPublicConnections { 4 };
 	bool IsLoggedIn;
 	bool ShouldCreateSessionOnLogin;
+	bool ShouldFindSessionsOnLogin;
 };
