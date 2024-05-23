@@ -3,19 +3,28 @@
 
 #include "MultiplayerSessionsSubsystem.h"
 
+#include "Engine/LocalPlayer.h"
+#include "GameFramework/PlayerController.h"
 #include "OnlineSessionSettings.h"
 #include "OnlineSubsystem.h"
+#include "OnlineSubsystemUtils.h"
+#include "OnlineSubsystemTypes.h"
+#include "Interfaces/OnlineIdentityInterface.h"
 #include "Online/OnlineSessionNames.h"
 
 DEFINE_LOG_CATEGORY(LogMultiplayerSessionsSubsystem);
 
 UMultiplayerSessionsSubsystem::UMultiplayerSessionsSubsystem():
-	SessionInterface(nullptr),
+	LoginCompleteDelegate(FOnLoginCompleteDelegate::CreateUObject(this, &ThisClass::OnLoginComplete)),
 	CreateSessionCompleteDelegate(FOnCreateSessionCompleteDelegate::CreateUObject(this, &ThisClass::OnCreateSessionComplete)),
 	FindSessionsCompleteDelegate(FOnFindSessionsCompleteDelegate::CreateUObject(this, &ThisClass::OnFindSessionsComplete)),
 	JoinSessionCompleteDelegate(FOnJoinSessionCompleteDelegate::CreateUObject(this, &ThisClass::OnJoinSessionComplete)),
 	DestroySessionCompleteDelegate(FOnDestroySessionCompleteDelegate::CreateUObject(this, &ThisClass::OnDestroySessionComplete)),
-	StartSessionCompleteDelegate(FOnStartSessionCompleteDelegate::CreateUObject(this, &ThisClass::OnStartSessionComplete))
+	StartSessionCompleteDelegate(FOnStartSessionCompleteDelegate::CreateUObject(this, &ThisClass::OnStartSessionComplete)),
+	SessionInterface(nullptr),
+	IdentityInterface(nullptr),
+	IsLoggedIn(false),
+	ShouldCreateSessionOnLogin(false)
 {
 	const IOnlineSubsystem* Subsystem = IOnlineSubsystem::Get();
 	if (Subsystem == nullptr)
@@ -23,8 +32,79 @@ UMultiplayerSessionsSubsystem::UMultiplayerSessionsSubsystem():
 		UE_LOG(LogMultiplayerSessionsSubsystem, Error, TEXT("No Online Subsystem found"));
 		return;
 	}
-	
+
 	SessionInterface = Subsystem->GetSessionInterface();
+	IdentityInterface = Subsystem->GetIdentityInterface();
+}
+
+bool UMultiplayerSessionsSubsystem::TryAsyncLogin()
+{
+    /*
+    Tutorial 2: This function will access the EOS OSS via the OSS identity interface to log first into Epic Account Services, and then into Epic Game Services.
+    It will bind a delegate to handle the callback event once login call succeeeds or fails. 
+    All functions that access the OSS will have this structure: 1-Get OSS interface, 2-Bind delegate for callback and 3-Call OSS interface function (which will call the correspongin EOS OSS function)
+    */
+    // If you're logged in, don't try to login again.
+    // This can happen if your player travels to a dedicated server or different maps as BeginPlay() will be called each time.
+	if (!IsIdentityInterfaceInvalid())
+	{
+		UE_LOG(LogMultiplayerSessionsSubsystem, Warning, "Login failed. IdentityInterface is invalid.");
+		return false;
+	}
+    
+    const FUniqueNetIdPtr NetId = IdentityInterface->GetUniquePlayerId(0);
+    if (NetId != nullptr && IdentityInterface->GetLoginStatus(0) == ELoginStatus::LoggedIn)
+    {
+		UE_LOG(LogMultiplayerSessionsSubsystem, Warning, "Login failed. Player already Logged In.");
+        return false; 
+    }
+    
+    /* This binds a delegate so we can run our function when the callback completes. 0 represents the player number.
+    You should parametrize this Login function and pass the parameter here for splitscreen. 
+    */
+    LoginCompleteDelegateHandle = IdentityInterface->AddOnLoginCompleteDelegate_Handle(0, LoginCompleteDelegate);
+ 
+    // Grab command line parameters. If empty call hardcoded login function - Hardcoded login function useful for Play In Editor. 
+    FString AuthType; 
+    FParse::Value(FCommandLine::Get(), TEXT("AUTH_TYPE="), AuthType);
+ 
+    if (!AuthType.IsEmpty()) //If parameter is NOT empty we can autologin.
+    {
+        /* 
+        In most situations you will want to automatically log a player in using the parameters passed via CLI.
+        For example, using the exchange code for the Epic Games Store.
+        */
+        UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("Logging into EOS..."));
+      
+        if (!IdentityInterface->AutoLogin(0))
+        {
+            UE_LOG(LogMultiplayerSessionsSubsystem, Warning, TEXT("Failed to login. AutoLogin failed"));
+			// Clear our handle and reset the delegate.
+			IdentityInterface->ClearOnLoginCompleteDelegate_Handle(0, LoginCompleteDelegateHandle);
+            LoginCompleteDelegateHandle.Reset();
+        	return false;
+        }
+    }
+    else
+    {
+        /* 
+        Fallback if the CLI parameters are empty.Useful for PIE.
+        The type here could be developer if using the DevAuthTool, ExchangeCode if the game is launched via the Epic Games Launcher, etc...
+        */
+        const FOnlineAccountCredentials Credentials("AccountPortal","", "");
+ 
+        UE_LOG(LogTemp, Log, TEXT("Logging into EOS...")); // Log to the UE logs that we are trying to log in. 
+        
+        if (!IdentityInterface->Login(0, Credentials))
+        {
+            UE_LOG(LogTemp, Warning, TEXT("Failed to login. Login with Credentials failed "));
+			// Clear our handle and reset the delegate. 
+            IdentityInterface->ClearOnLoginCompleteDelegate_Handle(0, LoginCompleteDelegateHandle);
+            LoginCompleteDelegateHandle.Reset();
+        	return false;
+        }        
+    }
+	return true;
 }
 
 void UMultiplayerSessionsSubsystem::CreateSession(
@@ -34,6 +114,26 @@ void UMultiplayerSessionsSubsystem::CreateSession(
 {
 	// if a session already exists, destroy it first, and return early, then it will be created on the OnDestroySessionComplete callback
 	if (DestroyPreviousSessionIfExists(NumPublicConnections)) return;
+	if (!IsLoggedIn)
+	{
+		UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("User not logged in. Attempting to log in."));
+		ShouldCreateSessionOnLogin = true;
+		LastExtraSessionSettings = SessionSettings;
+		if(TryAsyncLogin())
+		{
+			UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("Async login initiated."));
+			return;
+		}
+		else
+		{
+			ShouldCreateSessionOnLogin = false;
+			UE_LOG(LogMultiplayerSessionsSubsystem, Error, TEXT("Failed to issue session creation"));
+			UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("Async login failed."));
+			MultiplayerOnCreateSessionComplete.Broadcast(false);
+			return;
+		}
+		
+	}
 
 	const bool bHasSuccessfullyIssuedAsyncCreateSession = TryAsyncCreateSession(SessionSettings);
 	if(!bHasSuccessfullyIssuedAsyncCreateSession)
@@ -69,6 +169,16 @@ bool UMultiplayerSessionsSubsystem::IsSessionInterfaceInvalid() const
 	if(!SessionInterface.IsValid())
 	{
 		UE_LOG(LogMultiplayerSessionsSubsystem, Error, TEXT("SessionInterface is not valid"));
+		return true;
+	}
+	return false;
+}
+
+bool UMultiplayerSessionsSubsystem::IsIdentityInterfaceInvalid() const
+{
+	if(!IdentityInterface.IsValid())
+	{
+		UE_LOG(LogMultiplayerSessionsSubsystem, Error, TEXT("IdentityInterface is not valid"));
 		return true;
 	}
 	return false;
@@ -266,6 +376,57 @@ bool UMultiplayerSessionsSubsystem::StartSession()
 		MultiplayerOnStartSessionComplete.Broadcast(false);
 	}
 	return bSuccess;
+}
+
+void UMultiplayerSessionsSubsystem::OnLoginComplete(
+	int LocalUserNum,
+	bool bWasSuccessful,
+	const FUniqueNetId& UserId,
+	const FString& Error
+)
+{
+	/*
+  This function handles the callback from logging in. You should not proceed with any EOS features until this function is called.
+  This function will remove the delegate that was bound in the Login() function.
+  */
+	if (bWasSuccessful)
+	{
+		UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("Login callback completed!"));; 
+		if (ShouldCreateSessionOnLogin)
+		{
+			UE_LOG(LogMultiplayerSessionsSubsystem, Warning, TEXT("Creating Session after loggin in."));
+			CreateSession(LastNumPublicConnections, LastExtraSessionSettings);
+			ShouldCreateSessionOnLogin = false;
+			LastExtraSessionSettings = TMap<FName, FString>();
+		}
+	}
+	else
+	{
+		UE_LOG(LogMultiplayerSessionsSubsystem, Warning, TEXT("EOS login failed."));
+		if (ShouldCreateSessionOnLogin)
+		{
+			UE_LOG(LogMultiplayerSessionsSubsystem, Warning, TEXT("Could not create session on login. Login failed."));
+			ShouldCreateSessionOnLogin = false;
+			MultiplayerOnCreateSessionComplete.Broadcast(false);
+		}
+	}
+
+	const IOnlineSubsystem* OnlineSubsystem = IOnlineSubsystem::Get();
+	if (OnlineSubsystem == nullptr)
+	{
+		UE_LOG(LogMultiplayerSessionsSubsystem, Warning, TEXT("OnlineSubsytem is null.")); 
+	}
+	
+	const IOnlineIdentityPtr Identity = OnlineSubsystem->GetIdentityInterface();
+	if (!Identity.IsValid())
+	{
+		UE_LOG(LogMultiplayerSessionsSubsystem, Warning, TEXT("IdentityIntefrace is null.")); 
+		MultiplayerOnCreateSessionComplete.Broadcast(false);
+	}
+	
+ 
+	Identity->ClearOnLoginCompleteDelegate_Handle(LocalUserNum, LoginCompleteDelegateHandle);
+	LoginCompleteDelegateHandle.Reset();
 }
 
 void UMultiplayerSessionsSubsystem::OnCreateSessionComplete(FName SessionName, bool bWasSuccessful)
