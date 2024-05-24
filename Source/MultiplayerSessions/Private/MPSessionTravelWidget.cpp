@@ -216,12 +216,6 @@ void UMPSessionTravelWidget::OnFindSessionsComplete(const TArray<FOnlineSessionS
 	UE_LOG(LogMPSessionTravelWidget, Warning, TEXT("%d Sessions Found"), SearchResults.Num());
 	for (const FOnlineSessionSearchResult& SearchResult : SearchResults)
 	{
-		if (!SearchResult.IsValid())
-		{
-			UE_LOG(LogMPSessionTravelWidget, Warning, TEXT("Invalid session result found"));
-			continue;
-		}
-		
 		UE_LOG(LogMPSessionTravelWidget, Log, TEXT("Session Found:"));
 		FString Id = SearchResult.GetSessionIdStr();
 		UE_LOG(LogMPSessionTravelWidget, Log, TEXT("SessionId %s:"), *Id);

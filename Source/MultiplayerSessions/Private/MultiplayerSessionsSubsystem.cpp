@@ -23,10 +23,9 @@ UMultiplayerSessionsSubsystem::UMultiplayerSessionsSubsystem():
 	StartSessionCompleteDelegate(FOnStartSessionCompleteDelegate::CreateUObject(this, &ThisClass::OnStartSessionComplete)),
 	SessionInterface(nullptr),
 	IdentityInterface(nullptr),
-	IsLoggedIn(false),
-	ShouldCreateSessionOnLogin(false)
+	IsLoggedIn(false)
 {
-	const IOnlineSubsystem* Subsystem = IOnlineSubsystem::Get("EOS");
+	const IOnlineSubsystem* Subsystem = IOnlineSubsystem::Get();
 	if (Subsystem == nullptr)
 	{
 		UE_LOG(LogMultiplayerSessionsSubsystem, Error, TEXT("No Online Subsystem found"));
@@ -38,7 +37,7 @@ UMultiplayerSessionsSubsystem::UMultiplayerSessionsSubsystem():
 	IdentityInterface = Subsystem->GetIdentityInterface();
 }
 
-bool UMultiplayerSessionsSubsystem::TryAsyncLogin()
+bool UMultiplayerSessionsSubsystem::TryAsyncLogin(const FPendingLoginAction& PendingLoginAction)
 {
     /*
     Tutorial 2: This function will access the EOS OSS via the OSS identity interface to log first into Epic Account Services, and then into Epic Game Services.
@@ -59,6 +58,7 @@ bool UMultiplayerSessionsSubsystem::TryAsyncLogin()
 		{
 			UE_LOG(LogMultiplayerSessionsSubsystem, Warning, TEXT("Login failed. Player already Logged In."));
 			IsLoggedIn = true;
+			PendingLoginAction.ExecuteIfBound();
 			return false; 
 		}
     }
@@ -66,6 +66,8 @@ bool UMultiplayerSessionsSubsystem::TryAsyncLogin()
     {
     	UE_LOG(LogMultiplayerSessionsSubsystem, Warning, TEXT("Could not retrieve Logged In status. NetId is null."));
     }
+	// These actions will be executed on successful Login
+	PendingLoginActionsQueue.push(PendingLoginAction);
 	
     
     /* This binds a delegate so we can run our function when the callback completes. 0 represents the player number.
@@ -126,23 +128,27 @@ void UMultiplayerSessionsSubsystem::CreateSession(
 	if (!IsLoggedIn)
 	{
 		UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("User not logged in. Attempting to log in."));
-		ShouldCreateSessionOnLogin = true;
-		LastExtraSessionSettings = SessionSettings;
-		if(TryAsyncLogin())
+		const bool bHasIssuedAsyncLogin =  
+			TryAsyncLogin(FPendingLoginAction::CreateLambda(
+				[this, NumPublicConnections, SessionSettings]()
+					{
+					CreateSession(NumPublicConnections, SessionSettings);
+					}
+				)
+			);
+		
+		if(bHasIssuedAsyncLogin)
 		{
 			UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("Async login initiated. Will create session after login."));
 			return;
 		}
-		else
+		
+		if (!IsLoggedIn)
 		{
-			ShouldCreateSessionOnLogin = false;
-			if (!IsLoggedIn)
-			{
-				UE_LOG(LogMultiplayerSessionsSubsystem, Error, TEXT("Failed to issue session creation"));
-				UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("Async login failed."));
-				MultiplayerOnCreateSessionComplete.Broadcast(false);
-				return;	
-			}
+			UE_LOG(LogMultiplayerSessionsSubsystem, Error, TEXT("Failed to issue session creation"));
+			UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("Async login failed."));
+			MultiplayerOnCreateSessionComplete.Broadcast(false);
+			return;	
 		}
 		
 	}
@@ -219,24 +225,25 @@ bool UMultiplayerSessionsSubsystem::TryAsyncCreateSession(const TMap<FName, FStr
 
 void UMultiplayerSessionsSubsystem::SetupLastSessionSettings(const TMap<FName, FString>& ExtraSessionSettings)
 {
+	// if we're using the NULL subsystem, we're in a LAN match
 	if (!LastSessionSettings.IsValid())
 	{
 		LastSessionSettings = MakeShareable(new FOnlineSessionSettings);
 	}
-	// if we're using the NULL subsystem, we're in a LAN match
 	LastSessionSettings->bIsLANMatch =  IOnlineSubsystem::Get()->GetSubsystemName() == "NULL";
+	LastSessionSettings->bIsDedicated = false;
 	LastSessionSettings->NumPublicConnections = 4;
 	LastSessionSettings->bAllowJoinInProgress = true;
 	LastSessionSettings->bAllowJoinViaPresence = true;
 	LastSessionSettings->bShouldAdvertise = true;
 	LastSessionSettings->bUsesPresence = true;
-	LastSessionSettings->bUseLobbiesIfAvailable = true;
-	for (const auto& ExtraSessionSetting : ExtraSessionSettings)
-	{
-		const FName SettingName = ExtraSessionSetting.Key;
+	LastSessionSettings->bUseLobbiesIfAvailable = false;
+	 for (const auto& ExtraSessionSetting : ExtraSessionSettings)
+	 {
+	 	const FName SettingName = ExtraSessionSetting.Key;
 		const FString SettingValue = ExtraSessionSetting.Value;
-		LastSessionSettings->Set(SettingName, SettingValue, EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
-	}
+	 	LastSessionSettings->Set(SettingName, SettingValue, EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
+	 }
 }
 
 
@@ -248,6 +255,23 @@ bool UMultiplayerSessionsSubsystem::TryAsyncFindSessions(const int32 MaxSearchRe
 		SetupLastSessionSearchOptions(MaxSearchResults);
 		
 		FindSessionsCompleteDelegateHandle = SessionInterface->AddOnFindSessionsCompleteDelegate_Handle(FindSessionsCompleteDelegate);
+		if (LastSessionSearch->bIsLanQuery)
+		{
+			UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("Will perform Session Search in Lan"));
+		}
+		else
+		{
+			UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("Will perform Session Search in Web"));
+		}
+		
+		UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("List of query search params (name, value):"));
+		for (const auto& QuerySetting: LastSessionSearch->QuerySettings.SearchParams)
+		{
+			const FName SearchSettingName = QuerySetting.Key;
+			const FOnlineSessionSearchParam SearchParam = QuerySetting.Value;
+			UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("(%s: %s)"), *SearchSettingName.ToString(), *SearchParam.Data.ToString());
+		}
+		UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("****************************************"));
 		
 		if(
 			const ULocalPlayer* LocalPlayer = World->GetFirstLocalPlayerFromController();
@@ -282,6 +306,16 @@ void UMultiplayerSessionsSubsystem::SetupLastSessionSearchOptions(const int32 Ma
 	LastSessionSearch->QuerySettings.Set(SEARCH_PRESENCE, true, EOnlineComparisonOp::Equals);
 }
 
+void UMultiplayerSessionsSubsystem::ExecutePendingLoginActions()
+{
+	while (!PendingLoginActionsQueue.empty())
+	{
+		FPendingLoginAction PendingAction = PendingLoginActionsQueue.front();
+		PendingLoginActionsQueue.pop();
+		PendingAction.ExecuteIfBound();
+	}
+}
+
 void UMultiplayerSessionsSubsystem::FindSessions(const int32 MaxSearchResults)
 {
 	if (IsSessionInterfaceInvalid()) return;
@@ -289,16 +323,22 @@ void UMultiplayerSessionsSubsystem::FindSessions(const int32 MaxSearchResults)
 	if (!IsLoggedIn)
 	{
 		UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("User not logged in. Attempting to log in."));
-		ShouldFindSessionsOnLogin = true;
-		LastMaxResults = MaxSearchResults;
-		if(TryAsyncLogin())
+		const bool HasIssuedAsyncLogin =  
+			TryAsyncLogin(FPendingLoginAction::CreateLambda(
+				[this, MaxSearchResults]()
+					{
+						FindSessions(MaxSearchResults);
+					}
+				)
+			);
+		
+		if(HasIssuedAsyncLogin)
 		{
 			UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("Async login initiated. Will find sessions after login."));
 			return;
 		}
 		
-		ShouldCreateSessionOnLogin = false;
-		if (!IsLoggedIn)
+		if (!HasIssuedAsyncLogin && !IsLoggedIn)
 		{
 			UE_LOG(LogMultiplayerSessionsSubsystem, Error, TEXT("Login Failed. Can't find sessions"));
 			MultiplayerOnFindSessionsComplete.Broadcast(TArray<FOnlineSessionSearchResult> (),false);
@@ -425,36 +465,12 @@ void UMultiplayerSessionsSubsystem::OnLoginComplete(
 	IsLoggedIn = bWasSuccessful;
 	if (bWasSuccessful)
 	{
-		UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("Login success.")); 
-		if (ShouldCreateSessionOnLogin)
-		{
-			UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("Creating Session after successful Login."));
-			CreateSession(LastNumPublicConnections, LastExtraSessionSettings);
-			ShouldCreateSessionOnLogin = false;
-			LastExtraSessionSettings = TMap<FName, FString>();
-		}
-		if (ShouldFindSessionsOnLogin)
-		{
-			UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("Finding Sessions after successful Login."));
-			FindSessions(LastMaxResults);
-			ShouldFindSessionsOnLogin = false;
-		}
+		UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("Login success."));
+		ExecutePendingLoginActions();
 	}
 	else
 	{
 		UE_LOG(LogMultiplayerSessionsSubsystem, Warning, TEXT("Login failed. Reason: '%s'"), *Error);
-		if (ShouldCreateSessionOnLogin)
-		{
-			UE_LOG(LogMultiplayerSessionsSubsystem, Warning, TEXT("Could not create session on Login. Login failed."));
-			ShouldCreateSessionOnLogin = false;
-			MultiplayerOnCreateSessionComplete.Broadcast(false);
-		}
-		if (ShouldFindSessionsOnLogin)
-		{
-			UE_LOG(LogMultiplayerSessionsSubsystem, Warning, TEXT("Could not find sessions on Login. Login failed."));
-			ShouldFindSessionsOnLogin = false;
-			MultiplayerOnFindSessionsComplete.Broadcast(TArray<FOnlineSessionSearchResult>(), false);
-		}
 	}
 	MultiplayerOnLoginComplete.Broadcast(LocalUserNum, bWasSuccessful, UserId, Error);
 
@@ -480,6 +496,8 @@ void UMultiplayerSessionsSubsystem::OnCreateSessionComplete(FName SessionName, b
 	{
 		UE_LOG(LogMultiplayerSessionsSubsystem, Error, TEXT("MultiplayerSessionSubsystem: Failed to create session"));
 	}
+	const auto NamedSession = SessionInterface->GetNamedSession(SessionName);
+	UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("MultiplayerSessionSubsystem: Session ID %s"), *NamedSession->GetSessionIdStr());
 
 	SessionInterface->ClearOnCreateSessionCompleteDelegate_Handle(CreateSessionCompleteDelegateHandle);
 	MultiplayerOnCreateSessionComplete.Broadcast(bWasSuccessful);

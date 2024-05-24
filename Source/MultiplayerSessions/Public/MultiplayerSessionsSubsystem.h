@@ -6,6 +6,7 @@
 #include "Interfaces/OnlineIdentityInterface.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "Interfaces/OnlineSessionInterface.h"
+#include "queue"
 
 #include "MultiplayerSessionsSubsystem.generated.h"
 
@@ -20,10 +21,8 @@ DECLARE_MULTICAST_DELEGATE_TwoParams(FMultiplayerOnFindSessionsComplete, const T
 DECLARE_MULTICAST_DELEGATE_TwoParams(FMultiplayerOnJoinSessionComplete, const FName& SessionName, EOnJoinSessionCompleteResult::Type Result);
 DECLARE_MULTICAST_DELEGATE_OneParam(FMultiplayerOnStartSessionComplete, bool bWasSuccessful);
 DECLARE_MULTICAST_DELEGATE_OneParam(FMultiplayerOnDestroySessionComplete, bool bWasSuccessful);
+DECLARE_DELEGATE(FPendingLoginAction) // Used to delegate function calls to be executed after login. Used for find, create, and joint session if user is not already Logged in
 
-/**
- * 
- */
 UCLASS()
 class MULTIPLAYERSESSIONS_API UMultiplayerSessionsSubsystem : public UGameInstanceSubsystem
 {
@@ -31,7 +30,7 @@ class MULTIPLAYERSESSIONS_API UMultiplayerSessionsSubsystem : public UGameInstan
 
 public:
 	UMultiplayerSessionsSubsystem();
-	bool TryAsyncLogin();
+	bool TryAsyncLogin(const FPendingLoginAction& PendingLoginAction);
 
 	/**
 	 * To handle session functionality
@@ -87,8 +86,6 @@ private:
 	IOnlineIdentityPtr IdentityInterface;
 	TSharedPtr<FOnlineSessionSettings> LastSessionSettings;
 	TSharedPtr<FOnlineSessionSearch> LastSessionSearch;
-	int32 LastMaxResults;
-	TMap<FName, FString> LastExtraSessionSettings;
 
 	/**
 	 * To add to the Online Session Interface delegate list.
@@ -110,6 +107,8 @@ private:
 	bool bCreateSessionOnDestroy { false };
 	int32 LastNumPublicConnections { 4 };
 	bool IsLoggedIn;
-	bool ShouldCreateSessionOnLogin;
-	bool ShouldFindSessionsOnLogin;
+	
+private:
+	std::queue<FPendingLoginAction> PendingLoginActionsQueue;
+	void ExecutePendingLoginActions();
 };
