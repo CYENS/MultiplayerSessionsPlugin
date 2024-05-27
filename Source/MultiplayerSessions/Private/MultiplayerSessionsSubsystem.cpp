@@ -56,9 +56,12 @@ bool UMultiplayerSessionsSubsystem::TryAsyncLogin(const FPendingLoginAction& Pen
     {
 		if(IdentityInterface->GetLoginStatus(0) == ELoginStatus::LoggedIn)
 		{
-			UE_LOG(LogMultiplayerSessionsSubsystem, Warning, TEXT("Login failed. Player already Logged In."));
+			UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("Player already Logged In."));
 			IsLoggedIn = true;
-			PendingLoginAction.ExecuteIfBound();
+			// if(PendingLoginAction.ExecuteIfBound())
+			// {
+			// 	UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("Post-login action executed"));
+			// }
 			return false; 
 		}
     }
@@ -142,22 +145,24 @@ void UMultiplayerSessionsSubsystem::CreateSession(
 			UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("Async login initiated. Will create session after login."));
 			return;
 		}
-		
+
+		// if async login wasn't issued and player wasn't already login then something went wrong with login.
 		if (!IsLoggedIn)
 		{
-			UE_LOG(LogMultiplayerSessionsSubsystem, Error, TEXT("Failed to issue session creation"));
-			UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("Async login failed."));
+			UE_LOG(LogMultiplayerSessionsSubsystem, Error, TEXT("Failed to issue session creation. Async Login failed and player not already logged in."));
 			MultiplayerOnCreateSessionComplete.Broadcast(false);
 			return;	
 		}
-		
 	}
 
 	const bool bHasSuccessfullyIssuedAsyncCreateSession = TryAsyncCreateSession(SessionSettings);
 	if(!bHasSuccessfullyIssuedAsyncCreateSession)
 	{
-		UE_LOG(LogMultiplayerSessionsSubsystem, Error, TEXT("Failed to issue session creation"));
+		UE_LOG(LogMultiplayerSessionsSubsystem, Error, TEXT("CreateSession failed to issue"));
 		MultiplayerOnCreateSessionComplete.Broadcast(false);
+	}
+	{
+		UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("CreateSession successfully issued"));
 	}
 }
 
@@ -306,14 +311,24 @@ void UMultiplayerSessionsSubsystem::SetupLastSessionSearchOptions(const int32 Ma
 	LastSessionSearch->QuerySettings.Set(SEARCH_PRESENCE, true, EOnlineComparisonOp::Equals);
 }
 
-void UMultiplayerSessionsSubsystem::ExecutePendingLoginActions()
+bool UMultiplayerSessionsSubsystem::ExecutePendingLoginActions()
 {
+	bool HasAnyActionBeenExecuted = false;
 	while (!PendingLoginActionsQueue.empty())
 	{
 		FPendingLoginAction PendingAction = PendingLoginActionsQueue.front();
 		PendingLoginActionsQueue.pop();
-		PendingAction.ExecuteIfBound();
+		if(PendingAction.ExecuteIfBound())
+		{
+			HasAnyActionBeenExecuted = true;
+		}
 	}
+	return HasAnyActionBeenExecuted;
+}
+
+void UMultiplayerSessionsSubsystem::ClearPendingLoginActions()
+{
+	std::queue<FPendingLoginAction>().swap(PendingLoginActionsQueue);
 }
 
 void UMultiplayerSessionsSubsystem::FindSessions(const int32 MaxSearchResults)
@@ -466,10 +481,14 @@ void UMultiplayerSessionsSubsystem::OnLoginComplete(
 	if (bWasSuccessful)
 	{
 		UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("Login success."));
-		ExecutePendingLoginActions();
+		if(ExecutePendingLoginActions())
+		{
+			UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("Post-login actions executed"));
+		}
 	}
 	else
 	{
+		ClearPendingLoginActions();
 		UE_LOG(LogMultiplayerSessionsSubsystem, Warning, TEXT("Login failed. Reason: '%s'"), *Error);
 	}
 	MultiplayerOnLoginComplete.Broadcast(LocalUserNum, bWasSuccessful, UserId, Error);
@@ -483,18 +502,16 @@ void UMultiplayerSessionsSubsystem::OnLoginComplete(
 
 void UMultiplayerSessionsSubsystem::OnCreateSessionComplete(FName SessionName, bool bWasSuccessful)
 {
-	if (!SessionInterface.IsValid())
-	{
-		UE_LOG(LogMultiplayerSessionsSubsystem, Error, TEXT("SessionInterface is not valid"));
+	if (IsSessionInterfaceInvalid())
 		return;
-	}
+	
 	if (bWasSuccessful)
 	{
 		UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("Session %s has been created!"), *SessionName.ToString());
 	}
 	else
 	{
-		UE_LOG(LogMultiplayerSessionsSubsystem, Error, TEXT("MultiplayerSessionSubsystem: Failed to create session"));
+		UE_LOG(LogMultiplayerSessionsSubsystem, Error, TEXT("Failed to create session %s"), *SessionName.ToString());
 	}
 	const auto NamedSession = SessionInterface->GetNamedSession(SessionName);
 	UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("MultiplayerSessionSubsystem: Session ID %s"), *NamedSession->GetSessionIdStr());

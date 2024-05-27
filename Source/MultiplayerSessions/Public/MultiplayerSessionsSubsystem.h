@@ -110,5 +110,6 @@ private:
 	
 private:
 	std::queue<FPendingLoginAction> PendingLoginActionsQueue;
-	void ExecutePendingLoginActions();
+	bool ExecutePendingLoginActions();
+	void ClearPendingLoginActions();
 };
