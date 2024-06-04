@@ -3,18 +3,12 @@
 
 #include "MultiplayerSessionsSubsystem.h"
 
-#include <eos_sdk.h>
-
 #include "Engine/LocalPlayer.h"
 #include "GameFramework/PlayerController.h"
 #include "OnlineSessionSettings.h"
 #include "OnlineSubsystem.h"
 #include "OnlineSubsystemUtils.h"
 #include "OnlineSubsystemTypes.h"
-#include "eos_auth.h"
-#include "eos_common.h"
-#include "OnlineSubsystemNames.h"
-
 #include "Interfaces/OnlineIdentityInterface.h"
 #include "Online/OnlineSessionNames.h"
 
@@ -111,12 +105,7 @@ bool UMultiplayerSessionsSubsystem::TryAsyncLogin(const FPendingLoginAction& Pen
         Fallback if the CLI parameters are empty.Useful for PIE.
         The type here could be developer if using the DevAuthTool, ExchangeCode if the game is launched via the Epic Games Launcher, etc...
         */
-        // const FOnlineAccountCredentials Credentials("AccountPortal","", "");
-        const FOnlineAccountCredentials Credentials(
-        	"externalauth",
-        	"xyza7891DBPp9ZW12ngXVhO9LPzduKmg",
-        	"eyJ0IjoiZXBpY19pZCIsImFsZyI6IlJTMjU2Iiwia2lkIjoiV01TN0Vua0lHcGNIOURHWnN2MldjWTl4c3VGblpDdHhaamo0QWhiLV84RSJ9.eyJzdWIiOiJkOTgzMmExZTJhNmE0NDI0OGQzODJmZThkZTY5ODc3MCIsImlzcyI6Imh0dHBzOi8vYXBpLmVwaWNnYW1lcy5kZXYvZXBpYy9vYXV0aC92MSIsImRuIjoiSXRoaWxGYXJvdGgiLCJub25jZSI6Im4tc2JGcFhRQ1NOemJPelpZTUl6cmwzOWRyb2c4PSIsInBmcGlkIjoiMzBmZmUwMDQ3OTk3NGI0YjljYmNjMGI0NDRjNTIwM2MiLCJzZWMiOjEsImF1ZCI6Inh5emE3ODkxREJQcDlaVzEybmdYVmhPOUxQemR1S21nIiwidCI6ImVwaWNfaWQiLCJzY29wZSI6ImJhc2ljX3Byb2ZpbGUgZnJpZW5kc19saXN0IHByZXNlbmNlIiwiYXBwaWQiOiJmZ2hpNDU2N2hTS2VYZG5VZ01HbXpYQUlkSmdvZUVkbCIsImV4cCI6MTcxNzUxMzI1MSwiaWF0IjoxNzE3NTA2MDUxLCJqdGkiOiI1NzIwOTA3OTRjNTE0MTg3YmZkNmM5ZTY4NzMyN2YyOSJ9.iiJbxqMgOBfJ7nuLk5GsYbqrPJC3T9-Nwh_7rEA4hSIBVaJvz2HSKcAI9P9gUME56dt9GFEHPma9LkQp6kUckh_wCHgHt9IzpjrfOo0y3u-9-Xrx-ViZUkq9MmntDpaQP9EO-6UlqVG6otj4zj8wpApIRGA-NGmZKwdFWniXF95bpguWCLpK3HtKqR0qWvA-KyOtiIOy80mOGew0CzyNNSH4v6BbsxmGOkH5NA5lpdNxJdigvAt9KC-7x852gVb_OuG_ubSA7Vrle8rCZhuJEfYLoytYfaPqYqQd3BSGljKxgHHaj4_GjDiM9XxIwZIRNAi1C-umN7xkrTJwzSkYNA"
-        );
+        const FOnlineAccountCredentials Credentials("AccountPortal","", "");
  
         UE_LOG(LogTemp, Log, TEXT("Logging into EOS...")); // Log to the UE logs that we are trying to log in. 
         
@@ -641,5 +630,3 @@ bool UMultiplayerSessionsSubsystem::TryFirstLocalPlayerControllerClientTravel(co
 	}
 	return false;
 }
-
-// Assume these variables are correctly initialized somewhere in your code.
