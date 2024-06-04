@@ -108,6 +108,7 @@ private:
 	int32 LastNumPublicConnections { 4 };
 	bool IsLoggedIn;
 	
+	
 private:
 	std::queue<FPendingLoginAction> PendingLoginActionsQueue;
 	bool ExecutePendingLoginActions();
