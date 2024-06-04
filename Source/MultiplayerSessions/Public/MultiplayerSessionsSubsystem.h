@@ -3,6 +3,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "IOnlineSubsystemEOS.h"
+#include "OnlineSubsystem.h"
 #include "Interfaces/OnlineIdentityInterface.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "Interfaces/OnlineSessionInterface.h"
@@ -22,6 +24,8 @@ DECLARE_MULTICAST_DELEGATE_TwoParams(FMultiplayerOnJoinSessionComplete, const FN
 DECLARE_MULTICAST_DELEGATE_OneParam(FMultiplayerOnStartSessionComplete, bool bWasSuccessful);
 DECLARE_MULTICAST_DELEGATE_OneParam(FMultiplayerOnDestroySessionComplete, bool bWasSuccessful);
 DECLARE_DELEGATE(FPendingLoginAction) // Used to delegate function calls to be executed after login. Used for find, create, and joint session if user is not already Logged in
+
+typedef TSharedPtr<class IVoiceChatUser, ESPMode::ThreadSafe> IOnlineVoiceChatUserPtr;
 
 UCLASS()
 class MULTIPLAYERSESSIONS_API UMultiplayerSessionsSubsystem : public UGameInstanceSubsystem
@@ -84,6 +88,8 @@ protected:
 private:
 	IOnlineSessionPtr SessionInterface;
 	IOnlineIdentityPtr IdentityInterface;
+	IOnlineVoicePtr VoiceInterface;
+	IVoiceChatUser* VoiceChatUserInterface;
 	TSharedPtr<FOnlineSessionSettings> LastSessionSettings;
 	TSharedPtr<FOnlineSessionSearch> LastSessionSearch;
 

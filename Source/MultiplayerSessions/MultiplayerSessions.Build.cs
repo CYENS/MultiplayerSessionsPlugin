@@ -30,6 +30,7 @@ public class MultiplayerSessions : ModuleRules
 				"OnlineSubsystemSteam",
 				"OnlineSubsystemEOS",
 				"OnlineSubsystemUtils",
+				"EOSVoiceChat",
 				"UMG",
 				// ... add other public dependencies that you statically link with here ...
 			}

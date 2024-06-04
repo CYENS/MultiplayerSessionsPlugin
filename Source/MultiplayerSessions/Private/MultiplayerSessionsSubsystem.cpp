@@ -7,12 +7,15 @@
 #include "GameFramework/PlayerController.h"
 #include "OnlineSessionSettings.h"
 #include "OnlineSubsystem.h"
+#include "IOnlineSubsystemEOS.h"
 #include "OnlineSubsystemUtils.h"
+#include "EOSVoiceChat.h"
 #include "OnlineSubsystemTypes.h"
 #include "Interfaces/OnlineIdentityInterface.h"
 #include "Online/OnlineSessionNames.h"
 
 DEFINE_LOG_CATEGORY(LogMultiplayerSessionsSubsystem);
+
 
 UMultiplayerSessionsSubsystem::UMultiplayerSessionsSubsystem():
 	LoginCompleteDelegate(FOnLoginCompleteDelegate::CreateUObject(this, &ThisClass::OnLoginComplete)),
@@ -35,6 +38,7 @@ UMultiplayerSessionsSubsystem::UMultiplayerSessionsSubsystem():
 
 	SessionInterface = Subsystem->GetSessionInterface();
 	IdentityInterface = Subsystem->GetIdentityInterface();
+	VoiceInterface = Subsystem->GetVoiceInterface();
 }
 
 bool UMultiplayerSessionsSubsystem::TryAsyncLogin(const FPendingLoginAction& PendingLoginAction)
@@ -89,7 +93,9 @@ bool UMultiplayerSessionsSubsystem::TryAsyncLogin(const FPendingLoginAction& Pen
         For example, using the exchange code for the Epic Games Store.
         */
         UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("Logging into EOS..."));
-      
+
+    	// Do the login,
+    	// Have a websocket active from unreal engine tou our pixelstream web app, web app sends the token and auth to unreal engine, FCommandLine::Set(
         if (!IdentityInterface->AutoLogin(0))
         {
             UE_LOG(LogMultiplayerSessionsSubsystem, Warning, TEXT("Failed to login. AutoLogin failed"));
@@ -106,6 +112,10 @@ bool UMultiplayerSessionsSubsystem::TryAsyncLogin(const FPendingLoginAction& Pen
         The type here could be developer if using the DevAuthTool, ExchangeCode if the game is launched via the Epic Games Launcher, etc...
         */
         const FOnlineAccountCredentials Credentials("AccountPortal","", "");
+    	FString TokenFromWebSocket;
+        const FOnlineAccountCredentials Credentials("externalauth","clientId", TokenFromWebSocket);
+    	
+    	
  
         UE_LOG(LogTemp, Log, TEXT("Logging into EOS...")); // Log to the UE logs that we are trying to log in. 
         
@@ -481,6 +491,23 @@ void UMultiplayerSessionsSubsystem::OnLoginComplete(
 	if (bWasSuccessful)
 	{
 		UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("Login success."));
+		if(IOnlineSubsystemEOS* SubsystemEos = static_cast<IOnlineSubsystemEOS*>(IOnlineSubsystemEOS::Get()))
+		{
+			VoiceChatUserInterface = SubsystemEos->GetVoiceChatUserInterface(UserId);
+			if(VoiceChatUserInterface)
+			{
+				UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("Sucessfully Retrieved IVoiceChatUser"));
+			}
+			else
+			{
+				UE_LOG(LogMultiplayerSessionsSubsystem, Warning, TEXT("Could not Retrieve IVoiceChatUser"));
+			}
+		}
+		else
+		{
+			UE_LOG(LogMultiplayerSessionsSubsystem, Warning, TEXT("Could not Retrieve IVoiceChatUser. Not an EOS Subsystem"));
+		}
+	
 		if(ExecutePendingLoginActions())
 		{
 			UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("Post-login actions executed"));
