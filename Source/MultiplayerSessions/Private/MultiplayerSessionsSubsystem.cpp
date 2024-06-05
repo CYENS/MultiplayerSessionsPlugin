@@ -3,6 +3,7 @@
 
 #include "MultiplayerSessionsSubsystem.h"
 
+#include "IOnlineSubsystemEOS.h"
 #include "Engine/LocalPlayer.h"
 #include "GameFramework/PlayerController.h"
 #include "OnlineSessionSettings.h"
@@ -35,6 +36,7 @@ UMultiplayerSessionsSubsystem::UMultiplayerSessionsSubsystem():
 
 	SessionInterface = Subsystem->GetSessionInterface();
 	IdentityInterface = Subsystem->GetIdentityInterface();
+	// Subsystem->GetVoiceInterface();
 }
 
 bool UMultiplayerSessionsSubsystem::TryAsyncLogin(const FPendingLoginAction& PendingLoginAction)
@@ -481,6 +483,11 @@ void UMultiplayerSessionsSubsystem::OnLoginComplete(
 	if (bWasSuccessful)
 	{
 		UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("Login success."));
+		IOnlineSubsystem* Subsystem = IOnlineSubsystem::Get();
+		auto SubsystemEos = static_cast<IOnlineSubsystemEOS*>(Subsystem);
+		auto VoiceChatUserInterface = SubsystemEos->GetVoiceChatUserInterface(UserId);
+		VoiceChatUserInterface->
+		
 		if(ExecutePendingLoginActions())
 		{
 			UE_LOG(LogMultiplayerSessionsSubsystem, Log, TEXT("Post-login actions executed"));
