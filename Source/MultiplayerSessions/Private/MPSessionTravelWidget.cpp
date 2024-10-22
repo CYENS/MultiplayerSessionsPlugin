@@ -39,9 +39,11 @@ void UMPSessionTravelWidget::MenuSetup(
 
 void UMPSessionTravelWidget::CreateSession(
 	const TSoftObjectPtr<UWorld> LobbyServerTravelMap,
-	const TMap<FName, FString>& SessionSettings
+	const TMap<FName, FString>& SessionSettings,
+	const FString OptionsString
 	) 
 {
+	CurrentOptionsString = OptionsString;
 	LobbyMapAsset = LobbyServerTravelMap;
 	if (MultiplayerSessionsSubsystem == nullptr)
 	{
@@ -168,8 +170,10 @@ void UMPSessionTravelWidget::OnCreateSessionComplete(bool bWasSuccessful)
 	
 	const FString ServerTravelLobbyMapPath = GetServerTravelLobbyMapPath();
 	UE_LOG(LogMPSessionTravelWidget, Log, TEXT("Menu: ServerTravelLobbyMapPath set to: %s"), *ServerTravelLobbyMapPath);
-	
-	if (World->ServerTravel(ServerTravelLobbyMapPath))
+
+	const FString ConnectionString = ServerTravelLobbyMapPath + CurrentOptionsString;
+	UE_LOG(LogMPSessionTravelWidget, Log, TEXT("Menu: ConnectionString: %s"), *ConnectionString);
+	if (World->ServerTravel(ConnectionString))
 	{
 		UE_LOG(LogMPSessionTravelWidget, Log, TEXT("Menu: Listen Server Travelled to LobbyMap"));
 	}

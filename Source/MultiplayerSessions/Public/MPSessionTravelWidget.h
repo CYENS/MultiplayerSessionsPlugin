@@ -30,7 +30,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Multiplayer Sessions")
 	void CreateSession(
 		const TSoftObjectPtr<UWorld> LobbyServerTravelMap,
-		const TMap<FName, FString>& SessionSettings
+		const TMap<FName, FString>& SessionSettings,
+		const FString OptionsString
 	);
 
 	UFUNCTION(BlueprintCallable, Category="Μultiplayer Sessions")
@@ -67,4 +68,6 @@ private:
 	void MenuTeardown();
 
 	int32 NumPublicConnections { 4 };
+
+	FString CurrentOptionsString {};
 };
